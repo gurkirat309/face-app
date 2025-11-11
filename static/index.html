@@ -1,0 +1,105 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Emotion Demo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 20px; display: grid; gap: 16px; }
+    .row { display: grid; grid-template-columns: 480px auto; gap: 16px; align-items: start; }
+    #video, #overlay { width: 480px; height: 360px; border-radius: 10px; border: 1px solid #ddd; }
+    #wrap { position: relative; width: 480px; height: 360px; }
+    #overlay { position: absolute; left: 0; top: 0; }
+    .badge { display:inline-block; padding: 6px 10px; border-radius: 999px; background:#eee; }
+    button { padding: 8px 12px; border-radius: 8px; border: 1px solid #ccc; background: #fafafa; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    pre { background:#f6f6f6; padding: 12px; border-radius: 8px; overflow:auto; max-height: 280px;}
+  </style>
+</head>
+<body>
+  <h2>Face Emotion Recognition (FastAPI)</h2>
+  <div class="row">
+    <div id="wrap">
+      <video id="video" autoplay muted playsinline></video>
+      <canvas id="overlay"></canvas>
+    </div>
+    <div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <span>Top emotion:</span> <span id="label" class="badge">—</span>
+      </div>
+      <div style="margin-top:12px; display:flex; gap:8px;">
+        <button id="startBtn">Start</button>
+        <button id="stopBtn" disabled>Stop</button>
+      </div>
+      <h4 style="margin-top:18px;">Raw detections</h4>
+      <pre id="log">{}</pre>
+    </div>
+  </div>
+
+  <canvas id="capture" width="224" height="224" style="display:none"></canvas>
+
+  <script>
+    const video = document.getElementById('video');
+    const overlay = document.getElementById('overlay');
+    const octx = overlay.getContext('2d');
+    const capt = document.getElementById('capture');
+    const cctx = capt.getContext('2d');
+    const labelEl = document.getElementById('label');
+    const log = document.getElementById('log');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn  = document.getElementById('stopBtn');
+
+    let ws = null, stream = null, ticker = null;
+
+    async function start() {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 360 }, audio: false });
+      video.srcObject = stream;
+
+      await new Promise(r => video.onloadedmetadata = r);
+      overlay.width = video.videoWidth; overlay.height = video.videoHeight;
+
+      ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+      ws.onmessage = e => {
+        const msg = JSON.parse(e.data);
+        labelEl.textContent = msg.top_label;
+        drawDetections(msg.detections || []);
+        log.textContent = JSON.stringify(msg, null, 2);
+      };
+
+      // send ~5 fps
+      ticker = setInterval(() => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        // center-crop square then scale down for bandwidth
+        const vw = video.videoWidth, vh = video.videoHeight;
+        const size = Math.min(vw, vh), sx = (vw - size)/2, sy = (vh - size)/2;
+        cctx.drawImage(video, sx, sy, size, size, 0, 0, capt.width, capt.height);
+        const dataUrl = capt.toDataURL('image/jpeg', 0.75);
+        ws.send(dataUrl);
+      }, 200);
+
+      startBtn.disabled = true; stopBtn.disabled = false;
+    }
+
+    function drawDetections(dets) {
+      octx.clearRect(0, 0, overlay.width, overlay.height);
+      for (const d of dets) {
+        const [x,y,w,h] = d.box;
+        octx.lineWidth = 2; octx.strokeStyle = "#00ff00"; octx.strokeRect(x,y,w,h);
+        octx.font = "16px system-ui"; octx.fillStyle = "rgba(0,0,0,0.7)";
+        octx.fillText(d.label, x+4, y-6 < 14 ? y+14 : y-6);
+      }
+    }
+
+    function stop() {
+      if (ticker) { clearInterval(ticker); ticker = null; }
+      if (ws) { ws.close(); ws = null; }
+      if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+      octx.clearRect(0,0,overlay.width, overlay.height);
+      labelEl.textContent = "—";
+      startBtn.disabled = false; stopBtn.disabled = true;
+    }
+
+    startBtn.onclick = start;
+    stopBtn.onclick = stop;
+  </script>
+</body>
+</html>
