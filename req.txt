@@ -1,6 +1,11 @@
 fastapi
 uvicorn[standard]
-tensorflow==2.16.1
+tensorflow==2.16.1            # for face model if you used TF h5 earlier
 numpy
 Pillow
-opencv-python
+opencv-python-headless
+torch                         # for HF audio model
+transformers
+librosa
+pydub
+soundfile
