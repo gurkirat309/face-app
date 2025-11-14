@@ -13,7 +13,9 @@ from starlette.middleware.cors import CORSMiddleware
 
 from app.infer import predict_frame    # ensure this file exposes predict_frame
 from app.voice_infer import predict_emotion_from_wav_file  # returns same dict shape as before
-from app.sensors import load_live_sensors, compute_wellness
+
+from app.sensors import load_live_sensors, compute_wellness_from_sensors
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +28,7 @@ app.add_middleware(
 )
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 @app.get("/", response_class=HTMLResponse)
 def index():
@@ -128,28 +131,43 @@ async def websocket_endpoint(ws: WebSocket):
         logger.exception("Unexpected websocket error")
 @app.get("/sensors")
 def get_sensors():
-    """Return latest raw sensor readings."""
-    return load_live_sensors()
+    """
+    Return latest raw sensor values (heart_rate, temperature, lux, sound_db)
+    """
+    data = load_live_sensors()
+    if not data:
+        return {"error": "no sensor data"}
+    # return only the requested keys (do not expose raw payload unless needed)
+    return {
+        "heart_rate": data.get("heart_rate"),
+        "temperature": data.get("temperature"),
+        "lux": data.get("lux"),
+        "sound_db": data.get("sound_db"),
+        "timestamp": data.get("raw", {}).get("timestamp")
+    }
 
 @app.get("/wellness")
-def get_wellness():
+def wellness_index():
     """
-    Returns overall wellness score + classification.
-    Combines heart rate, temperature, light, sound.
+    Compute wellness index using only heart_rate, temperature, lux, sound_db.
     """
-    sensors = load_live_sensors()
-    if not sensors:
-        return {"error": "No sensor data available"}
+    data = load_live_sensors()
+    if not data:
+        return {"error": "no sensor data"}
 
-    score, status = compute_wellness(
-        sensors.get("heart_rate", 0),
-        sensors.get("temperature", 0),
-        sensors.get("light", 0),
-        sensors.get("sound_db", 0),
-    )
+    hr = data.get("heart_rate", 0)
+    temp = data.get("temperature", 0)
+    lux = data.get("lux", 0)
+    sound_db = data.get("sound_db", 0)
 
+    result = compute_wellness_from_sensors(hr, temp, lux, sound_db)
     return {
-        "sensors": sensors,
-        "wellness_score": score,
-        "wellness_status": status
-    }        
+        "sensors": {
+            "heart_rate": hr,
+            "temperature": temp,
+            "lux": lux,
+            "sound_db": sound_db,
+            "timestamp": data.get("raw", {}).get("timestamp")
+        },
+        "wellness": result
+    }
