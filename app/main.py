@@ -13,6 +13,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from app.infer import predict_frame    # ensure this file exposes predict_frame
 from app.voice_infer import predict_emotion_from_wav_file  # returns same dict shape as before
+from app.sensors import load_live_sensors, compute_wellness
 
 logger = logging.getLogger(__name__)
 
@@ -125,3 +126,30 @@ async def websocket_endpoint(ws: WebSocket):
         logger.info("Websocket disconnected")
     except Exception:
         logger.exception("Unexpected websocket error")
+@app.get("/sensors")
+def get_sensors():
+    """Return latest raw sensor readings."""
+    return load_live_sensors()
+
+@app.get("/wellness")
+def get_wellness():
+    """
+    Returns overall wellness score + classification.
+    Combines heart rate, temperature, light, sound.
+    """
+    sensors = load_live_sensors()
+    if not sensors:
+        return {"error": "No sensor data available"}
+
+    score, status = compute_wellness(
+        sensors.get("heart_rate", 0),
+        sensors.get("temperature", 0),
+        sensors.get("light", 0),
+        sensors.get("sound_db", 0),
+    )
+
+    return {
+        "sensors": sensors,
+        "wellness_score": score,
+        "wellness_status": status
+    }        
