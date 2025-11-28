@@ -83,11 +83,13 @@ def load_live_sensors() -> Dict[str, Any]:
         heart_rate = float(last.get("HR", last.get("heartRate", last.get("heart_rate", 0))))
         temperature = float(last.get("Temp", last.get("temperature", last.get("temp", last.get("tempC", 0)))))
         lux = float(last.get("Lux", last.get("lux", last.get("light", 0))))
+        buzzer = int(last.get("buzzer", last.get("Buzzer", 0)))
 
         return {
             "heart_rate": heart_rate,
             "temperature": temperature,
             "lux": lux,
+            "buzzer": buzzer,
             "raw": last
         }
 

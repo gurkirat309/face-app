@@ -133,7 +133,7 @@ async def websocket_endpoint(ws: WebSocket):
 @app.get("/sensors")
 def get_sensors():
     """
-    Return latest raw sensor values (heart_rate, temperature, lux, sound_db)
+    Return latest raw sensor values (heart_rate, temperature, lux, buzzer)
     """
     data = load_live_sensors()
     if not data:
@@ -143,7 +143,7 @@ def get_sensors():
         "heart_rate": data.get("heart_rate"),
         "temperature": data.get("temperature"),
         "lux": data.get("lux"),
-        "sound_db": data.get("sound_db"),
+        "buzzer": data.get("buzzer"),
         "timestamp": data.get("raw", {}).get("timestamp")
     }
 
@@ -159,6 +159,7 @@ def wellness_index():
     hr = data.get("heart_rate", 0)
     temp = data.get("temperature", 0)
     lux = data.get("lux", 0)
+    buzzer = data.get("buzzer", 0)
 
     result = compute_wellness_from_sensors(hr, temp, lux)
     return {
@@ -166,6 +167,7 @@ def wellness_index():
             "heart_rate": hr,
             "temperature": temp,
             "lux": lux,
+            "buzzer": buzzer,
             "timestamp": data.get("raw", {}).get("timestamp")
         },
         "wellness": result
@@ -228,11 +230,16 @@ def wellness_complete():
     if not sensor_data:
         return {"error": "no sensor data available"}
     
+    # Get latest sensor reading for buzzer status
+    latest_sensor = load_live_sensors()
+    buzzer_status = latest_sensor.get("buzzer", 0) if latest_sensor else 0
+    
     return {
         "sleep": analyze_sleep(sensor_data),
         "sedentary": detect_sedentary(sensor_data),
         "stress": score_hrv(sensor_data),
-        "burnout": compute_burnout(sensor_data)
+        "burnout": compute_burnout(sensor_data),
+        "buzzer": buzzer_status
     }
 
 @app.get("/wellness/demo")
