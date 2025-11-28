@@ -1,0 +1,92 @@
+[
+  {
+    "heartRate": 75.2,
+    "rmssd": 38.5,
+    "lux": 320.0,
+    "tempC": 23.5,
+    "motion": 1,
+    "buzzer": 0,
+    "timestamp": "2025-11-28 22:00:00",
+    "status": "awake"
+  },
+  {
+    "heartRate": 72.8,
+    "rmssd": 40.2,
+    "lux": 280.0,
+    "tempC": 23.2,
+    "motion": 1,
+    "buzzer": 0,
+    "timestamp": "2025-11-28 22:15:00",
+    "status": "awake"
+  },
+  {
+    "heartRate": 68.5,
+    "rmssd": 42.1,
+    "lux": 150.0,
+    "tempC": 22.8,
+    "motion": 0,
+    "buzzer": 0,
+    "timestamp": "2025-11-28 22:30:00",
+    "status": "getting_sleepy"
+  },
+  {
+    "heartRate": 62.3,
+    "rmssd": 45.8,
+    "lux": 5.2,
+    "tempC": 22.5,
+    "motion": 0,
+    "buzzer": 0,
+    "timestamp": "2025-11-28 23:00:00",
+    "status": "sleeping"
+  },
+  {
+    "heartRate": 58.7,
+    "rmssd": 48.3,
+    "lux": 2.1,
+    "tempC": 22.0,
+    "motion": 0,
+    "buzzer": 0,
+    "timestamp": "2025-11-28 23:30:00",
+    "status": "deep_sleep"
+  },
+  {
+    "heartRate": 56.2,
+    "rmssd": 52.1,
+    "lux": 1.5,
+    "tempC": 21.8,
+    "motion": 0,
+    "buzzer": 0,
+    "timestamp": "2025-11-28 02:00:00",
+    "status": "deep_sleep"
+  },
+  {
+    "heartRate": 59.8,
+    "rmssd": 49.2,
+    "lux": 3.8,
+    "tempC": 22.2,
+    "motion": 0,
+    "buzzer": 0,
+    "timestamp": "2025-11-28 05:00:00",
+    "status": "sleeping"
+  },
+  {
+    "heartRate": 65.5,
+    "rmssd": 44.5,
+    "lux": 45.0,
+    "tempC": 22.8,
+    "motion": 1,
+    "buzzer": 0,
+    "timestamp": "2025-11-28 06:30:00",
+    "status": "waking_up"
+  },
+  {
+    "heartRate": 72.0,
+    "rmssd": 40.8,
+    "lux": 250.0,
+    "tempC": 23.5,
+    "motion": 1,
+    "buzzer": 0,
+    "timestamp": "2025-11-28 07:00:00",
+    "status": "awake"
+  }
+]

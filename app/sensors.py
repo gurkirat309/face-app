@@ -9,13 +9,46 @@ logger = logging.getLogger(__name__)
 # Path to the JSON file (adjust if your file is elsewhere)
 SENSOR_JSON_PATH = os.path.join(os.getcwd(), "sensor_data.json")
 
+def load_all_sensor_data() -> list:
+    """
+    Load all sensor records from sensor_data.json.
+    Returns list of all sensor readings for historical analysis.
+    """
+    try:
+        if not os.path.exists(SENSOR_JSON_PATH):
+            return []
+
+        with open(SENSOR_JSON_PATH, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+            if not content:
+                return []
+
+        # Try parse as JSON array
+        try:
+            parsed = json.loads(content)
+            if isinstance(parsed, list):
+                return parsed
+            elif isinstance(parsed, dict):
+                # single object, wrap in list
+                return [parsed]
+            else:
+                return []
+        except Exception:
+            # Fallback to JSON-lines
+            lines = [l.strip() for l in content.splitlines() if l.strip()]
+            return [json.loads(line) for line in lines]
+
+    except Exception as e:
+        logger.exception("load_all_sensor_data error: %s", e)
+        return []
+
 def load_live_sensors() -> Dict[str, Any]:
     """
     Read the last sensor record from sensor_data.json.
     Supports:
       - JSON array: [ {...}, {...}, ... ] -> returns last element
       - JSON-lines (one JSON per line) -> returns last non-empty line
-    Returns dict with keys: heart_rate, temperature, lux, sound_db
+    Returns dict with keys: heart_rate, temperature, lux
     """
     try:
         if not os.path.exists(SENSOR_JSON_PATH):
@@ -47,16 +80,14 @@ def load_live_sensors() -> Dict[str, Any]:
             return {}
 
         # Map/normalize keys (handle different naming)
-        heart_rate = float(last.get("heartRate", last.get("heart_rate", 0)))
-        temperature = float(last.get("temperature", last.get("temp", last.get("tempC", 0))))
-        lux = float(last.get("lux", last.get("light", 0)))
-        sound_db = float(last.get("soundDB", last.get("sound", last.get("sound_db", 0))))
+        heart_rate = float(last.get("HR", last.get("heartRate", last.get("heart_rate", 0))))
+        temperature = float(last.get("Temp", last.get("temperature", last.get("temp", last.get("tempC", 0)))))
+        lux = float(last.get("Lux", last.get("lux", last.get("light", 0))))
 
         return {
             "heart_rate": heart_rate,
             "temperature": temperature,
             "lux": lux,
-            "sound_db": sound_db,
             "raw": last
         }
 
@@ -64,20 +95,20 @@ def load_live_sensors() -> Dict[str, Any]:
         logger.exception("load_live_sensors error: %s", e)
         return {}
 
-def compute_wellness_from_sensors(heart_rate: float, temperature: float, lux: float, sound_db: float) -> Dict[str, Any]:
+def compute_wellness_from_sensors(heart_rate: float, temperature: float, lux: float) -> Dict[str, Any]:
     """
-    Compute a wellness score (0-100) based on heart rate, temperature (C), lux and sound dB.
+    Compute a wellness score (0-100) based on heart rate, temperature (C), and lux.
+    soundDB has been removed from wellness calculations.
     Returns: {score:float, status:str, breakdown: {...}}
     Tunable logic:
       - heart_rate: ideal 60-100 bpm -> full points; below/above penalized
-      - temperature (C): ideal 36.1-37.2C -> penalize if outside (user's sensor shows ~29 so adjust if Celsius)
+      - temperature (C): ideal 20-26C for environment
       - lux: low light (<50) slightly penalized, good indoor 100-500, too bright >1000 penalized
-      - sound_db: >80 very noisy (penalize), 60-80 moderate
     """
     score = 100.0
     breakdown = {}
 
-    # HEART RATE (weight 30)
+    # HEART RATE (weight 40%)
     hr_score = 50.0  # base out of 100 for HR subscore then weighted
     if heart_rate <= 0:
         hr_score = 20.0
@@ -95,18 +126,21 @@ def compute_wellness_from_sensors(heart_rate: float, temperature: float, lux: fl
             hr_score = max(0.0, 100.0 - diff * 2.0)  # 2 points per bpm outside
     breakdown["heart_rate_subscore"] = round(hr_score, 2)
 
-    # TEMPERATURE (weight 30) - assume degrees Celsius
+    # TEMPERATURE (weight 40%) - environmental temperature
     temp_score = 50.0
-    # ideal roughly 36.1 - 37.2 C
-    if 36.1 <= temperature <= 37.2:
+    # ideal roughly 20 - 26 C for environment
+    if 20 <= temperature <= 26:
         temp_score = 100.0
     else:
-        # penalize: 1 degree outside -> -25 points (quick drop)
-        diff = min(abs(temperature - 36.65), 10)
-        temp_score = max(0.0, 100.0 - diff * 25.0)
+        # penalize: temperature outside comfort range
+        if temperature < 20:
+            diff = 20 - temperature
+        else:
+            diff = temperature - 26
+        temp_score = max(0.0, 100.0 - diff * 10.0)
     breakdown["temperature_subscore"] = round(temp_score, 2)
 
-    # LUX (weight 20)
+    # LUX (weight 20%)
     # prefer moderate indoor light: 100 - 1000 lux
     if lux <= 0:
         lux_score = 40.0
@@ -122,26 +156,11 @@ def compute_wellness_from_sensors(heart_rate: float, temperature: float, lux: fl
             lux_score = max(0.0, 100.0 - (lux - 1000) * 0.02)  # mild penalty
     breakdown["lux_subscore"] = round(lux_score, 2)
 
-    # SOUND DB (weight 20)
-    if sound_db <= 0:
-        sound_score = 70.0
-    else:
-        if sound_db <= 50:
-            sound_score = 100.0
-        elif sound_db <= 65:
-            sound_score = 80.0
-        elif sound_db <= 80:
-            sound_score = 50.0
-        else:
-            sound_score = 20.0
-    breakdown["sound_subscore"] = round(sound_score, 2)
-
     # combine with weights
-    # weights: HR 30%, Temp 30%, Lux 20%, Sound 20% (sum 100)
-    total = (breakdown["heart_rate_subscore"] * 0.30 +
-             breakdown["temperature_subscore"] * 0.30 +
-             breakdown["lux_subscore"] * 0.20 +
-             breakdown["sound_subscore"] * 0.20)
+    # weights: HR 40%, Temp 40%, Lux 20% (sum 100)
+    total = (breakdown["heart_rate_subscore"] * 0.40 +
+             breakdown["temperature_subscore"] * 0.40 +
+             breakdown["lux_subscore"] * 0.20)
 
     total = max(0.0, min(100.0, total))
     if total >= 80:

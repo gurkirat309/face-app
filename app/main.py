@@ -14,7 +14,8 @@ from starlette.middleware.cors import CORSMiddleware
 from app.infer import predict_frame    # ensure this file exposes predict_frame
 from app.voice_infer import predict_emotion_from_wav_file  # returns same dict shape as before
 
-from app.sensors import load_live_sensors, compute_wellness_from_sensors
+from app.sensors import load_live_sensors, compute_wellness_from_sensors, load_all_sensor_data
+from app.wellness_engine import analyze_sleep, detect_sedentary, score_hrv, compute_burnout
 
 
 logger = logging.getLogger(__name__)
@@ -149,7 +150,7 @@ def get_sensors():
 @app.get("/wellness")
 def wellness_index():
     """
-    Compute wellness index using only heart_rate, temperature, lux, sound_db.
+    Compute wellness index using only heart_rate, temperature, lux (no soundDB).
     """
     data = load_live_sensors()
     if not data:
@@ -158,16 +159,107 @@ def wellness_index():
     hr = data.get("heart_rate", 0)
     temp = data.get("temperature", 0)
     lux = data.get("lux", 0)
-    sound_db = data.get("sound_db", 0)
 
-    result = compute_wellness_from_sensors(hr, temp, lux, sound_db)
+    result = compute_wellness_from_sensors(hr, temp, lux)
     return {
         "sensors": {
             "heart_rate": hr,
             "temperature": temp,
             "lux": lux,
-            "sound_db": sound_db,
             "timestamp": data.get("raw", {}).get("timestamp")
         },
         "wellness": result
+    }
+
+@app.get("/wellness/sleep")
+def wellness_sleep():
+    """
+    Analyze sleep patterns and calculate sleep score.
+    """
+    sensor_data = load_all_sensor_data()
+    if not sensor_data:
+        return {"error": "no sensor data available"}
+    
+    result = analyze_sleep(sensor_data)
+    return result
+
+@app.get("/wellness/sedentary")
+def wellness_sedentary():
+    """
+    Detect sedentary behavior during waking hours.
+    """
+    sensor_data = load_all_sensor_data()
+    if not sensor_data:
+        return {"error": "no sensor data available"}
+    
+    result = detect_sedentary(sensor_data)
+    return result
+
+@app.get("/wellness/stress")
+def wellness_stress():
+    """
+    Analyze HRV and heart rate for stress assessment.
+    """
+    sensor_data = load_all_sensor_data()
+    if not sensor_data:
+        return {"error": "no sensor data available"}
+    
+    result = score_hrv(sensor_data)
+    return result
+
+@app.get("/wellness/burnout")
+def wellness_burnout():
+    """
+    Comprehensive burnout index calculation.
+    """
+    sensor_data = load_all_sensor_data()
+    if not sensor_data:
+        return {"error": "no sensor data available"}
+    
+    result = compute_burnout(sensor_data)
+    return result
+
+@app.get("/wellness/complete")
+def wellness_complete():
+    """
+    Get all wellness analyses in one response.
+    """
+    sensor_data = load_all_sensor_data()
+    if not sensor_data:
+        return {"error": "no sensor data available"}
+    
+    return {
+        "sleep": analyze_sleep(sensor_data),
+        "sedentary": detect_sedentary(sensor_data),
+        "stress": score_hrv(sensor_data),
+        "burnout": compute_burnout(sensor_data)
+    }
+
+@app.get("/wellness/demo")
+def wellness_demo():
+    """
+    Demo endpoint using pre-recorded sleep data for presentations.
+    Perfect for demonstrating sleep detection without actually sleeping!
+    """
+    import json
+    import os
+    
+    demo_file = "demo_sleep_data.json"
+    if not os.path.exists(demo_file):
+        return {
+            "error": "Demo data file not found",
+            "message": "Please ensure demo_sleep_data.json exists in the project root"
+        }
+    
+    with open(demo_file, 'r') as f:
+        demo_data = json.load(f)
+    
+    return {
+        "message": "Demo data - simulated 24-hour sleep cycle",
+        "data_points": len(demo_data),
+        "sleep": analyze_sleep(demo_data),
+        "sedentary": detect_sedentary(demo_data),
+        "stress": score_hrv(demo_data),
+        "burnout": compute_burnout(demo_data),
+        "sample_readings": demo_data[:3] + demo_data[-3:]  # First 3 and last 3 readings
     }
