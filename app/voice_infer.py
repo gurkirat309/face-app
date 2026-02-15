@@ -1,153 +1,162 @@
 # app/voice_infer.py
-import os
-import tempfile
-import base64
-import traceback
-import logging
-import random
 
-import torch
+import os
+import random
+import logging
 import numpy as np
-from transformers import AutoModelForAudioClassification, AutoFeatureExtractor
+import torch
 import librosa
-  # needs ffmpeg on system
+from transformers import (
+    AutoModelForAudioClassification,
+    AutoFeatureExtractor,
+    pipeline,
+    WhisperProcessor,
+    WhisperForConditionalGeneration
+)
 
 logger = logging.getLogger(__name__)
 
-MODEL_ID = "firdhokk/speech-emotion-recognition-with-openai-whisper-large-v3"
+device = torch.device("cpu")
 
-# ---- load model + extractor (similar to your flask file) ----
-try:
-    logger.info(f"Loading audio model {MODEL_ID} ...")
-    model = AutoModelForAudioClassification.from_pretrained(MODEL_ID)
-    feature_extractor = AutoFeatureExtractor.from_pretrained(MODEL_ID, do_normalize=True)
-    id2label = model.config.id2label
-    logger.info("Audio model loaded")
-except Exception as e:
-    logger.exception("Failed loading audio model; entering fallback mode")
-    model = None
-    feature_extractor = None
-    id2label = {
-        0: "angry",
-        1: "disgust",
-        2: "fearful",
-        3: "happy",
-        4: "neutral",
-        5: "sad",
-        6: "surprised"
+# -------------------------------
+# 1️⃣ AUDIO EMOTION MODEL
+# -------------------------------
+
+AUDIO_MODEL_ID = "firdhokk/speech-emotion-recognition-with-openai-whisper-large-v3"
+
+model = AutoModelForAudioClassification.from_pretrained(AUDIO_MODEL_ID)
+feature_extractor = AutoFeatureExtractor.from_pretrained(AUDIO_MODEL_ID)
+model.to(device)
+model.eval()
+
+id2label = model.config.id2label
+
+# -------------------------------
+# 2️⃣ WHISPER ASR MODEL
+# -------------------------------
+
+ASR_MODEL_ID = "openai/whisper-small"
+
+whisper_processor = WhisperProcessor.from_pretrained(ASR_MODEL_ID)
+whisper_model = WhisperForConditionalGeneration.from_pretrained(ASR_MODEL_ID)
+whisper_model.to(device)
+whisper_model.eval()
+
+# -------------------------------
+# 3️⃣ TEXT EMOTION NLP MODEL
+# -------------------------------
+
+text_emotion_pipeline = pipeline(
+    "text-classification",
+    model="j-hartmann/emotion-english-distilroberta-base",
+    return_all_scores=True,
+    framework="pt",   # FORCE PyTorch
+    device=-1
+)
+
+
+# -------------------------------
+# HELPERS
+# -------------------------------
+
+def load_audio(path, sr=16000):
+    y, sr = librosa.load(path, sr=sr)
+    y = librosa.util.normalize(y)
+    return y
+
+
+def transcribe_audio(audio_array):
+    inputs = whisper_processor(
+        audio_array,
+        sampling_rate=16000,
+        return_tensors="pt"
+    )
+    input_features = inputs.input_features.to(device)
+
+    with torch.no_grad():
+        predicted_ids = whisper_model.generate(input_features)
+
+    transcription = whisper_processor.batch_decode(
+        predicted_ids,
+        skip_special_tokens=True
+    )[0]
+
+    return transcription
+
+
+def predict_audio_emotion(audio_array):
+    inputs = feature_extractor(
+        audio_array,
+        sampling_rate=16000,
+        return_tensors="pt"
+    )
+
+    inputs = {k: v.to(device) for k, v in inputs.items()}
+
+    with torch.no_grad():
+        outputs = model(**inputs)
+        probs = torch.nn.functional.softmax(outputs.logits, dim=-1)[0]
+
+    probs = probs.cpu().numpy()
+    pred_id = int(np.argmax(probs))
+    label = id2label[pred_id]
+    confidence = float(probs[pred_id]) * 100
+
+    all_probs = {
+        id2label[i]: round(float(probs[i]) * 100, 2)
+        for i in range(len(probs))
     }
 
-EMOTION_RECOMMENDATIONS = {
-    'angry': ["Take deep breaths and count to 10", "Go for a short walk to cool down"],
-    'disgust': ["Focus on positive aspects", "Practice mindfulness"],
-    'fearful': ["Grounding techniques", "Deep breathing"],
-    'happy': ["Savor this positive emotion", "Share your happiness"],
-    'neutral': ["Reflect on goals", "Practice gratitude"],
-    'sad': ["Allow feelings", "Connect with someone"],
-    'surprised': ["Process the event", "Focus on breathing"]
-}
-EMOTION_TO_STRESS = {
-    'angry': 'high', 'disgust': 'high', 'fearful': 'high', 'sad': 'high',
-    'surprised': 'medium', 'neutral': 'medium', 'happy': 'low'
-}
+    return label, confidence, all_probs
 
-# audio loading / preprocessing helpers (taken & simplified from your Flask code)
-def _to_wav_bytes_from_webm_or_ogg(raw_bytes: bytes, input_format: str = "webm") -> bytes:
-    # uses pydub (ffmpeg) to convert webm/ogg -> wav bytes
-    audio = AudioSegment.from_file(io.BytesIO(raw_bytes), format=input_format)
-    buf = io.BytesIO()
-    audio.export(buf, format="wav")
-    return buf.getvalue()
 
-def load_audio_with_librosa(path, sr=16000):
-    y, s = librosa.load(path, sr=sr)
-    return y, s
+def analyze_text_emotion(text):
+    results = text_emotion_pipeline(text)[0]
 
-def preprocess_for_model(audio_path, max_duration=30.0):
-    # loads audio using librosa/fallback like your flask code and returns `inputs` for HF extractor
-    try:
-        y, sr = load_audio_with_librosa(audio_path, sr=16000)
-    except Exception as e:
-        # fallback more thorough loaders could be placed here -- for brevity, re-raise
-        logger.exception("librosa failed to load; re-raising")
-        raise
+    probs = {r["label"]: round(r["score"] * 100, 2) for r in results}
+    top = max(probs, key=probs.get)
 
-    # truncate/pad
-    max_len = int(16000 * max_duration)
-    if len(y) > max_len:
-        y = y[:max_len]
-    if len(y) < 8000:
-        y = np.pad(y, (0, 8000 - len(y)), 'constant')
+    return top, probs
 
-    # normalize
-    y = librosa.util.normalize(y)
 
-    if feature_extractor:
-        inputs = feature_extractor(y, sampling_rate=16000, return_tensors="pt")
-        return inputs, y
-    else:
-        return None, y
+# -------------------------------
+# MAIN FUNCTION
+# -------------------------------
 
-def predict_emotion_from_wav_file(wav_path, max_duration=30.0):
-    """Main entry: given path to WAV file, returns same JSON as your Flask predict_emotion"""
-    try:
-        if model is None:
-            # fallback randomized output
-            emotions = list(id2label.values())
-            emotion = random.choice(emotions)
-            confidence = random.uniform(0.6, 0.95)
-            result = {
-                'emotion': emotion,
-                'confidence': confidence,
-                'confidence_str': f"{confidence:.2%}",
-                'stress_level': EMOTION_TO_STRESS.get(emotion, 'medium'),
-                'recommendation': random.choice(EMOTION_RECOMMENDATIONS.get(emotion, [])),
-                'all_probabilities': {e: random.uniform(0.01, 0.2) for e in emotions},
-                'audio_duration': 5.0,
-                'note': 'fallback mode (model not loaded)'
-            }
-            return result
+def predict_emotion_from_wav_file(wav_path):
 
-        inputs, audio_array = preprocess_for_model(wav_path, max_duration=max_duration)
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        model.to(device)
-        inputs = {k: v.to(device) for k, v in inputs.items()}
+    audio_array = load_audio(wav_path)
 
-        with torch.no_grad():
-            outputs = model(**inputs)
-            logits = outputs.logits
-            probs = torch.nn.functional.softmax(logits, dim=-1)[0].cpu().numpy()
-            pred_id = int(np.argmax(probs))
-            label = id2label[pred_id]
-            confidence = float(probs[pred_id])
-            all_probs = {id2label[i]: float(probs[i]) for i in range(len(probs))}
+    # 1️⃣ Transcription
+    transcript = transcribe_audio(audio_array)
 
-        result = {
-            'emotion': label,
-            'confidence': confidence,
-            'confidence_str': f"{confidence:.2%}",
-            'stress_level': EMOTION_TO_STRESS.get(label, 'medium'),
-            'recommendation': random.choice(EMOTION_RECOMMENDATIONS.get(label, [])),
-            'all_probabilities': all_probs,
-            'audio_duration': len(audio_array) / 16000.0
-        }
-        return result
-    except Exception as e:
-        logger.exception("Error during audio prediction")
-        # fallback emergency behavior like in your Flask app
-        emotions = list(id2label.values())
-        emotion = random.choice(emotions)
-        confidence = random.uniform(0.7, 0.9)
-        all_probs = {e: random.uniform(0.01, 0.2) for e in emotions}
-        all_probs[emotion] = confidence
-        return {
-            'emotion': emotion,
-            'confidence': confidence,
-            'confidence_str': f"{confidence:.2%}",
-            'stress_level': EMOTION_TO_STRESS.get(emotion, 'medium'),
-            'recommendation': random.choice(EMOTION_RECOMMENDATIONS.get(emotion, [])),
-            'all_probabilities': all_probs,
-            'audio_duration': 5.0,
-            'note': 'emergency fallback due to error'
-        }
+    # 2️⃣ Audio-based Emotion
+    audio_emotion, audio_conf, audio_probs = predict_audio_emotion(audio_array)
+
+    # 3️⃣ Text-based Emotion
+    text_emotion, text_probs = analyze_text_emotion(transcript)
+
+    # 4️⃣ Stress score logic
+    stress_mapping = {
+        "angry": 0.9,
+        "disgust": 0.85,
+        "fearful": 0.95,
+        "sad": 0.88,
+        "surprise": 0.6,
+        "neutral": 0.5,
+        "happy": 0.2
+    }
+
+    stress_score = stress_mapping.get(audio_emotion.lower(), 0.5)
+
+    return {
+        "transcript": transcript,
+        "audio_emotion": audio_emotion,
+        "audio_confidence": round(audio_conf, 2),
+        "audio_probabilities": audio_probs,
+        "text_emotion": text_emotion,
+        "text_probabilities": text_probs,
+        "stress_score": stress_score,
+        "duration_seconds": round(len(audio_array) / 16000, 2)
+    }

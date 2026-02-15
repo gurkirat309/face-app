@@ -1,32 +1,181 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <title>Face + Voice Emotion Demo (Record & Analyze)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body{font-family:Inter,system-ui,Arial;margin:20px;background:#fafafa;color:#111}
-    .wrap{display:flex;gap:20px;max-width:1100px;margin:0 auto}
-    .left{width:520px}
-    .card{background:#fff;padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.06)}
-    #wrapVideo{position:relative;width:480px;height:360px;background:#000;border-radius:8px;overflow:hidden}
-    video{width:480px;height:360px;object-fit:cover}
-    canvas#overlay{position:absolute;left:0;top:0;width:480px;height:360px;pointer-events:none}
-    .controls{display:flex;gap:8px;margin-top:10px}
-    button{padding:8px 12px;border-radius:8px;border:0;cursor:pointer;background:#0b84ff;color:#fff}
-    button.secondary{background:#eee;color:#111}
-    .muted{color:#666;font-size:13px}
-    .badge{background:#eef7ff;padding:6px 10px;border-radius:999px;display:inline-block}
-    .right{flex:1;display:flex;flex-direction:column;gap:12px}
-    pre{background:#fafafa;padding:10px;border-radius:8px;border:1px solid #f0f0f0;white-space:pre-wrap}
-    audio{width:100%;margin-top:8px}
+    body {
+      font-family: Inter, system-ui, Arial;
+      margin: 20px;
+      background: #fafafa;
+      color: #111
+    }
+
+    .wrap {
+      display: flex;
+      gap: 20px;
+      max-width: 1200px;
+      margin: 0 auto
+    }
+
+    .left {
+      width: 520px
+    }
+
+    .card {
+      background: #fff;
+      padding: 12px;
+      border-radius: 10px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+      margin-bottom: 12px
+    }
+
+    #wrapVideo {
+      position: relative;
+      width: 480px;
+      height: 360px;
+      background: #000;
+      border-radius: 8px;
+      overflow: hidden
+    }
+
+    video {
+      width: 480px;
+      height: 360px;
+      object-fit: cover
+    }
+
+    canvas#overlay {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 480px;
+      height: 360px;
+      pointer-events: none
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px
+    }
+
+    button {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 0;
+      cursor: pointer;
+      background: #0b84ff;
+      color: #fff
+    }
+
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed
+    }
+
+    button.secondary {
+      background: #eee;
+      color: #111
+    }
+
+    .muted {
+      color: #666;
+      font-size: 13px
+    }
+
+    .badge {
+      background: #eef7ff;
+      padding: 6px 10px;
+      border-radius: 999px;
+      display: inline-block;
+      font-weight: 600
+    }
+
+    .right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px
+    }
+
+    pre {
+      background: #fafafa;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #f0f0f0;
+      white-space: pre-wrap;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto
+    }
+
+    audio {
+      width: 100%;
+      margin-top: 8px
+    }
+
+    .section-title {
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #333;
+      display: block;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 4px;
+    }
+
+    .data-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .data-label {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .data-value {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    /* Stress Meter */
+    .stress-container {
+      margin-top: 10px;
+    }
+
+    .progress-bar {
+      width: 100%;
+      background: #eee;
+      border-radius: 10px;
+      height: 12px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      transition: width 0.5s ease-out, background-color 0.5s;
+    }
+
+    .chart-box {
+      height: 200px;
+      margin-top: 10px;
+    }
   </style>
 </head>
+
 <body>
-  <h2 style="text-align:center">Face + Voice Emotion Demo — Record, Listen, Analyze</h2>
+  <h2 style="text-align:center">Enhanced Emotion & Voice Analytics</h2>
   <div class="wrap">
     <div class="left">
       <div class="card">
+        <span class="section-title">Face Analytics</span>
         <div id="wrapVideo">
           <video id="video" autoplay muted playsinline></video>
           <canvas id="overlay"></canvas>
@@ -35,15 +184,14 @@
           <button id="startCam">Start Camera</button>
           <button id="stopCam" class="secondary" disabled>Stop Camera</button>
         </div>
-
-        <div style="margin-top:10px;">
-          <div class="muted">Face emotion:</div>
-          <div id="faceLabel" class="badge">—</div>
+        <div style="margin-top:10px;" class="data-row">
+          <span class="data-label">Emotion Detection:</span>
+          <span id="faceLabel" class="badge">—</span>
         </div>
       </div>
 
-      <div class="card" style="margin-top:12px">
-        <h4>Mic: record & analyze</h4>
+      <div class="card">
+        <span class="section-title">Voice: Record & Analyze</span>
         <div style="display:flex;gap:8px">
           <button id="recBtn">Record</button>
           <button id="pauseBtn" class="secondary" disabled>Pause</button>
@@ -51,229 +199,264 @@
           <button id="playBtn" class="secondary" disabled>Play</button>
           <button id="analyzeBtn" class="secondary" disabled>Analyze</button>
         </div>
-        <div style="margin-top:8px" class="muted">Recorded Speech Transcript / Audio-emotion</div>
-        <div id="transcript" style="font-weight:600;margin-top:6px">—</div>
-        <div id="audioMeta" style="margin-top:8px;color:#0b4a02"></div>
         <audio id="player" controls style="display:none"></audio>
+
+        <div style="margin-top:12px">
+          <span class="data-label">Transcript:</span>
+          <div id="transcript"
+            style="font-weight:600;margin-top:4px;padding:8px;background:#f9f9f9;border-radius:6px;min-height:40px">—
+          </div>
+        </div>
+
+        <div style="margin-top:12px" class="stress-container">
+          <div class="data-row">
+            <span class="data-label">Stress Level:</span>
+            <span id="stressVal" class="data-value">0%</span>
+          </div>
+          <div class="progress-bar">
+            <div id="stressBar" class="progress-fill" style="background-color:#4caf50"></div>
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="right">
       <div class="card">
-        <h4>Raw Detections (debug)</h4>
-        <pre id="log">{}</pre>
+        <span class="section-title">Voice Analytics</span>
+        <div class="data-row">
+          <span class="data-label">Audio Emotion:</span>
+          <span id="audioEmotion" class="badge">—</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">Audio Confidence:</span>
+          <span id="audioConf" class="data-value">—</span>
+        </div>
+        <div class="chart-box">
+          <canvas id="audioProbChart"></canvas>
+        </div>
       </div>
+
       <div class="card">
-        <h4>Connection</h4>
-        <div class="muted">WebSocket</div>
-        <div id="wsStatus" style="font-weight:700;margin-top:6px">disconnected</div>
+        <span class="section-title">Text Sentiment</span>
+        <div class="data-row">
+          <span class="data-label">Text Emotion:</span>
+          <span id="textEmotion" class="badge">—</span>
+        </div>
+        <div class="chart-box">
+          <canvas id="textProbChart"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="section-title">Debug Logs</span>
+        <pre id="log">{}</pre>
+        <div class="data-row" style="margin-top:8px">
+          <span class="data-label">Status:</span>
+          <span id="wsStatus" style="font-weight:700">disconnected</span>
+        </div>
       </div>
     </div>
   </div>
 
-<script>
-  // elements/state
-  const startCam = document.getElementById('startCam');
-  const stopCam = document.getElementById('stopCam');
-  const recBtn = document.getElementById('recBtn');
-  const pauseBtn = document.getElementById('pauseBtn');
-  const stopBtn = document.getElementById('stopBtn');
-  const playBtn = document.getElementById('playBtn');
-  const analyzeBtn = document.getElementById('analyzeBtn');
-  const video = document.getElementById('video');
-  const overlay = document.getElementById('overlay');
-  const octx = overlay.getContext('2d');
-  const capture = document.createElement('canvas');
-  const player = document.getElementById('player');
-  const wsStatus = document.getElementById('wsStatus');
-  const logEl = document.getElementById('log');
-  const faceLabel = document.getElementById('faceLabel');
-  const transcriptEl = document.getElementById('transcript');
-  const audioMetaEl = document.getElementById('audioMeta');
+  <script>
+    // UI Elements
+    const startCam = document.getElementById('startCam'), stopCam = document.getElementById('stopCam');
+    const recBtn = document.getElementById('recBtn'), pauseBtn = document.getElementById('pauseBtn'), stopBtn = document.getElementById('stopBtn');
+    const playBtn = document.getElementById('playBtn'), analyzeBtn = document.getElementById('analyzeBtn');
+    const video = document.getElementById('video'), overlay = document.getElementById('overlay'), octx = overlay.getContext('2d');
+    const player = document.getElementById('player'), wsStatus = document.getElementById('wsStatus'), logEl = document.getElementById('log');
+    const faceLabel = document.getElementById('faceLabel'), transcriptEl = document.getElementById('transcript');
+    const audioEmotionEl = document.getElementById('audioEmotion'), audioConfEl = document.getElementById('audioConf');
+    const textEmotionEl = document.getElementById('textEmotion'), stressValEl = document.getElementById('stressVal'), stressBarEl = document.getElementById('stressBar');
 
-  let camStream=null, captureTicker=null, ws=null;
-  // audio recording buffers using Web Audio API
-  let micStream=null, audioCtx=null, processor=null, buffers=[];
-  let recording=false, paused=false, recordedBlob=null;
+    let camStream = null, captureTicker = null, ws = null;
+    let micStream = null, audioCtx = null, processor = null, buffers = [];
+    let recording = false, paused = false, recordedBlob = null;
 
-  // websocket connect
-  function connectWS(){
-    if(ws && (ws.readyState===WebSocket.OPEN || ws.readyState===WebSocket.CONNECTING)) return ws;
-    const protocol = location.protocol==='https:' ? 'wss' : 'ws';
-    ws = new WebSocket(`${protocol}://${location.host}/ws`);
-    ws.onopen = ()=>{ wsStatus.textContent='connected'; console.log('WS open'); };
-    ws.onclose = ()=>{ wsStatus.textContent='disconnected'; console.log('WS closed'); };
-    ws.onerror = (e)=>{ wsStatus.textContent='error'; console.error(e); };
-    ws.onmessage = (evt)=> {
-      try{
-        const msg = JSON.parse(evt.data);
-        if(msg.type==='video'){
-          if(msg.top_label) faceLabel.textContent = msg.top_label;
-          if(msg.detections) {
-            drawDetections(msg.detections);
-            logEl.textContent = JSON.stringify(msg, null, 2);
+    // Charts
+    let audioChart = null, textChart = null;
+
+    function initCharts() {
+      const ctxA = document.getElementById('audioProbChart').getContext('2d');
+      const ctxT = document.getElementById('textProbChart').getContext('2d');
+
+      const commonOptions = {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { x: { beginAtZero: true, max: 100 } },
+        plugins: { legend: { display: false } }
+      };
+
+      audioChart = new Chart(ctxA, {
+        type: 'bar',
+        data: { labels: [], datasets: [{ data: [], backgroundColor: '#36a2eb' }] },
+        options: commonOptions
+      });
+
+      textChart = new Chart(ctxT, {
+        type: 'bar',
+        data: { labels: [], datasets: [{ data: [], backgroundColor: '#ff6384' }] },
+        options: commonOptions
+      });
+    }
+
+    function updateChart(chart, probabilities) {
+      if (!probabilities) return;
+      const labels = Object.keys(probabilities);
+      const values = Object.values(probabilities);
+      chart.data.labels = labels;
+      chart.data.datasets[0].data = values;
+      chart.update();
+    }
+
+    function updateStressMeter(score) {
+      const percent = Math.round(score * 100);
+      stressValEl.textContent = `${percent}%`;
+      stressBarEl.style.width = `${percent}%`;
+
+      // Dynamic color
+      if (percent < 30) stressBarEl.style.backgroundColor = '#4caf50';
+      else if (percent < 70) stressBarEl.style.backgroundColor = '#ffc107';
+      else stressBarEl.style.backgroundColor = '#f44336';
+    }
+
+    function connectWS() {
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return ws;
+      const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+      ws = new WebSocket(`${protocol}://${location.host}/ws`);
+      ws.onopen = () => { wsStatus.textContent = 'connected'; wsStatus.style.color = 'green'; };
+      ws.onclose = () => { wsStatus.textContent = 'disconnected'; wsStatus.style.color = 'red'; };
+      ws.onmessage = (evt) => {
+        try {
+          const msg = JSON.parse(evt.data);
+          logEl.textContent = JSON.stringify(msg, null, 2);
+
+          if (msg.type === 'video') {
+            if (msg.top_label) faceLabel.textContent = msg.top_label;
+            if (msg.detections) drawDetections(msg.detections);
+          } else if (msg.type === 'audio') {
+            transcriptEl.textContent = msg.transcript || '—';
+            audioEmotionEl.textContent = msg.audio_emotion || '—';
+            audioConfEl.textContent = msg.audio_confidence ? msg.audio_confidence.toFixed(1) + '%' : '—';
+            textEmotionEl.textContent = msg.text_emotion || '—';
+
+            updateChart(audioChart, msg.audio_probabilities);
+            updateChart(textChart, msg.text_probabilities);
+            updateStressMeter(msg.stress_score || 0);
           }
-        } else if(msg.type==='audio'){
-          transcriptEl.textContent = msg.transcript || msg.emotion || '—';
-          audioMetaEl.textContent = (msg.confidence_str || (msg.confidence ? (msg.confidence*100).toFixed(1)+'%':''));
-          logEl.textContent = JSON.stringify(msg, null, 2);
-        } else if(msg.type==='error'){
-          logEl.textContent = JSON.stringify(msg, null, 2);
-        }
-      } catch(e){
-        console.warn('WS parse', e);
-      }
-    };
-    return ws;
-  }
+        } catch (e) { console.warn('WS parse', e); }
+      };
+      return ws;
+    }
 
-  // video capture
-  async function startCamera(){
-    if(camStream) return;
-    try {
-      camStream = await navigator.mediaDevices.getUserMedia({video:{width:480,height:360}, audio:false});
-      video.srcObject = camStream;
-      await video.play();
-      overlay.width = video.videoWidth || 480;
-      overlay.height = video.videoHeight || 360;
-      capture.width = overlay.width; capture.height = overlay.height;
-      connectWS();
-      captureTicker = setInterval(()=>{
-        if(!ws || ws.readyState !== WebSocket.OPEN) return;
-        try{
+    // Camera & Video Capture
+    const capture = document.createElement('canvas');
+    async function startCamera() {
+      try {
+        camStream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 360 }, audio: false });
+        video.srcObject = camStream;
+        await video.play();
+        overlay.width = video.videoWidth; overlay.height = video.videoHeight;
+        capture.width = overlay.width; capture.height = overlay.height;
+        connectWS();
+        captureTicker = setInterval(() => {
+          if (!ws || ws.readyState !== WebSocket.OPEN) return;
           const ctx = capture.getContext('2d');
           ctx.drawImage(video, 0, 0, capture.width, capture.height);
-          const dataUrl = capture.toDataURL('image/jpeg', 0.6);
-          ws.send(JSON.stringify({type:'video', data: dataUrl}));
-        }catch(e){ console.warn(e); }
-      }, 200);
-      startCam.disabled=true; stopCam.disabled=false;
-    } catch(e){ alert('Cannot start camera: '+ e.message); }
-  }
-  function stopCamera(){
-    if(captureTicker){ clearInterval(captureTicker); captureTicker=null; }
-    if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; video.srcObject=null; }
-    octx.clearRect(0,0,overlay.width, overlay.height);
-    startCam.disabled=false; stopCam.disabled=true;
-  }
-
-  function drawDetections(dets=[]){
-    octx.clearRect(0,0,overlay.width, overlay.height);
-    for(const d of dets){
-      const [x,y,w,h] = d.box;
-      octx.strokeStyle='#36c636'; octx.lineWidth=2; octx.strokeRect(x,y,w,h);
-      octx.fillStyle='rgba(0,0,0,0.6)'; octx.font='16px system-ui';
-      const px = x+4, py = y-8<12 ? y+16 : y-8;
-      octx.fillText(d.label || '', px, py);
+          ws.send(JSON.stringify({ type: 'video', data: capture.toDataURL('image/jpeg', 0.6) }));
+        }, 200);
+        startCam.disabled = true; stopCam.disabled = false;
+      } catch (e) { alert('Camera error: ' + e.message); }
     }
-  }
 
-  // WEB AUDIO recorder -> buffer raw Float32 arrays
-  async function startRecord(){
-    if(recording) return;
-    try {
-      micStream = await navigator.mediaDevices.getUserMedia({audio:true});
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const source = audioCtx.createMediaStreamSource(micStream);
-      processor = audioCtx.createScriptProcessor(4096, 1, 1);
-      buffers = [];
-      processor.onaudioprocess = (e) => {
-        if(!recording || paused) return;
-        const input = e.inputBuffer.getChannelData(0);
-        buffers.push(new Float32Array(input)); // copy
+    function stopCamera() {
+      if (captureTicker) clearInterval(captureTicker);
+      if (camStream) camStream.getTracks().forEach(t => t.stop());
+      video.srcObject = null; octx.clearRect(0, 0, overlay.width, overlay.height);
+      startCam.disabled = false; stopCam.disabled = true;
+    }
+
+    function drawDetections(dets = []) {
+      octx.clearRect(0, 0, overlay.width, overlay.height);
+      dets.forEach(d => {
+        const [x, y, w, h] = d.box;
+        octx.strokeStyle = '#36c636'; octx.lineWidth = 2; octx.strokeRect(x, y, w, h);
+        octx.fillStyle = 'rgba(0,0,0,0.6)'; octx.font = '16px sans-serif';
+        octx.fillText(d.label || '', x + 4, y - 8 < 12 ? y + 16 : y - 8);
+      });
+    }
+
+    // Audio Recording
+    async function startRecord() {
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioCtx.createMediaStreamSource(micStream);
+        processor = audioCtx.createScriptProcessor(4096, 1, 1);
+        buffers = [];
+        processor.onaudioprocess = (e) => {
+          if (!recording || paused) return;
+          buffers.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+        };
+        source.connect(processor); processor.connect(audioCtx.destination);
+        recording = true; recBtn.textContent = 'Recording...';
+        pauseBtn.disabled = false; stopBtn.disabled = false; playBtn.disabled = true; analyzeBtn.disabled = true;
+        connectWS();
+      } catch (e) { alert('Mic error: ' + e.message); }
+    }
+
+    function stopRecord() {
+      recording = false; paused = false;
+      if (processor) processor.disconnect();
+      if (audioCtx) audioCtx.close();
+      if (micStream) micStream.getTracks().forEach(t => t.stop());
+      recBtn.textContent = 'Record'; pauseBtn.disabled = true; stopBtn.disabled = true;
+
+      const allLen = buffers.reduce((s, a) => s + a.length, 0);
+      const interleaved = new Float32Array(allLen);
+      let off = 0; buffers.forEach(b => { interleaved.set(b, off); off += b.length; });
+
+      recordedBlob = encodeWAV(interleaved, 48000);
+      playBtn.disabled = false; analyzeBtn.disabled = false;
+      player.src = URL.createObjectURL(recordedBlob); player.style.display = 'block';
+    }
+
+    function encodeWAV(samples, sampleRate) {
+      const buffer = new ArrayBuffer(44 + samples.length * 2), view = new DataView(buffer);
+      const writeString = (v, o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+      writeString(view, 0, 'RIFF'); view.setUint32(4, 36 + samples.length * 2, true);
+      writeString(view, 8, 'WAVE'); writeString(view, 12, 'fmt ');
+      view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+      writeString(view, 36, 'data'); view.setUint32(40, samples.length * 2, true);
+      for (let i = 0, o = 44; i < samples.length; i++, o += 2) {
+        let s = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
+      return new Blob([view], { type: 'audio/wav' });
+    }
+
+    async function analyzeRecording() {
+      if (!recordedBlob) return;
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        ws.send(JSON.stringify({ type: 'audio', action: 'analyze', format: 'wav', data: reader.result }));
+        analyzeBtn.disabled = true;
       };
-      source.connect(processor);
-      processor.connect(audioCtx.destination);
-      recording = true; paused = false;
-      recBtn.textContent = 'Recording...'; pauseBtn.disabled=false; stopBtn.disabled=false; playBtn.disabled=true; analyzeBtn.disabled=true;
-      connectWS();
-    } catch(e){ alert('Cannot access microphone: '+e.message); }
-  }
-
-  function pauseRecord(){
-    if(!recording) return;
-    paused = !paused;
-    pauseBtn.textContent = paused ? 'Resume' : 'Pause';
-  }
-
-  function stopRecord(){
-    if(!recording) return;
-    recording=false; paused=false;
-    // stop tracks and audio nodes
-    try{
-      if(processor){ processor.disconnect(); processor=null; }
-      if(audioCtx){ audioCtx.close(); audioCtx=null; }
-      if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; }
-    }catch(e){}
-    recBtn.textContent = 'Record'; pauseBtn.disabled=true; stopBtn.disabled=true;
-    // create WAV blob from buffers
-    const allLen = buffers.reduce((s,a)=>s+a.length,0);
-    const interleaved = new Float32Array(allLen);
-    let off = 0; for(const b of buffers){ interleaved.set(b, off); off += b.length; }
-    // encode as 16-bit PCM WAV at native sampleRate
-    const wavBlob = encodeWAVFromFloat32(interleaved,  audioCtx ? audioCtx.sampleRate : 48000);
-    recordedBlob = wavBlob;
-    // enable playback and analyze
-    playBtn.disabled=false; analyzeBtn.disabled=false;
-    // create object URL
-    const url = URL.createObjectURL(wavBlob);
-    player.src = url; player.style.display='block';
-    audioMetaEl.textContent = `Duration ≈ ${(allLen / (audioCtx ? audioCtx.sampleRate : 48000)).toFixed(2)}s`;
-  }
-
-  function playRecording(){
-    if(!recordedBlob) return;
-    const url = URL.createObjectURL(recordedBlob);
-    player.src = url;
-    player.play();
-    playBtn.textContent = 'Playing'; 
-    player.onended = ()=> playBtn.textContent = 'Play';
-  }
-
-  function encodeWAVFromFloat32(samples, sampleRate){
-    const buffer = new ArrayBuffer(44 + samples.length*2);
-    const view = new DataView(buffer);
-    function writeString(view, offset, str){ for(let i=0;i<str.length;i++) view.setUint8(offset+i, str.charCodeAt(i)); }
-    writeString(view, 0, 'RIFF'); view.setUint32(4, 36 + samples.length*2, true);
-    writeString(view, 8, 'WAVE'); writeString(view, 12, 'fmt ');
-    view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
-    view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate*2, true);
-    view.setUint16(32, 2, true); view.setUint16(34, 16, true);
-    writeString(view, 36, 'data'); view.setUint32(40, samples.length*2, true);
-    let offset=44;
-    for(let i=0;i<samples.length;i++,offset+=2){
-      let s = Math.max(-1, Math.min(1, samples[i]));
-      view.setInt16(offset, s<0 ? s*0x8000 : s*0x7FFF, true);
+      reader.readAsDataURL(recordedBlob);
     }
-    return new Blob([view], {type:'audio/wav'});
-  }
 
-  // analyze: send WAV to server only when user chooses
-  async function analyzeRecording(){
-    if(!recordedBlob) { alert('No recording available'); return; }
-    if(!ws || ws.readyState !== WebSocket.OPEN) connectWS();
-    const reader = new FileReader();
-    reader.onloadend = ()=> {
-      const base64data = reader.result; // data:audio/wav;base64,...
-      const payload = { type:'audio', action:'analyze', format:'wav', data: base64data };
-      ws.send(JSON.stringify(payload));
-      // disable analyze until new recording
-      analyzeBtn.disabled=true;
-    };
-    reader.readAsDataURL(recordedBlob);
-  }
+    // Event Listeners
+    startCam.onclick = startCamera; stopCam.onclick = stopCamera;
+    recBtn.onclick = startRecord; stopBtn.onclick = stopRecord;
+    pauseBtn.onclick = () => { paused = !paused; pauseBtn.textContent = paused ? 'Resume' : 'Pause'; };
+    playBtn.onclick = () => { player.play(); playBtn.textContent = 'Playing'; player.onended = () => playBtn.textContent = 'Play'; };
+    analyzeBtn.onclick = analyzeRecording;
 
-  // wire buttons
-  startCam.onclick = startCamera;
-  stopCam.onclick = stopCamera;
-  recBtn.onclick = startRecord;
-  pauseBtn.onclick = pauseRecord;
-  stopBtn.onclick = stopRecord;
-  playBtn.onclick = playRecording;
-  analyzeBtn.onclick = analyzeRecording;
-
-  // init UI state
-  pauseBtn.disabled=true; stopBtn.disabled=true; playBtn.disabled=true; analyzeBtn.disabled=true;
-</script>
+    initCharts();
+  </script>
 </body>
+
 </html>
