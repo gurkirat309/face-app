@@ -73,8 +73,14 @@ def transcribe_audio(audio_array):
     )
     input_features = inputs.input_features.to(device)
 
+    # Force English transcription
+    forced_decoder_ids = whisper_processor.get_decoder_prompt_ids(language="english", task="transcribe")
+
     with torch.no_grad():
-        predicted_ids = whisper_model.generate(input_features)
+        predicted_ids = whisper_model.generate(
+            input_features,
+            forced_decoder_ids=forced_decoder_ids
+        )
 
     transcription = whisper_processor.batch_decode(
         predicted_ids,
