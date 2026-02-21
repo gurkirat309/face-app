@@ -148,7 +148,7 @@ def predict_emotion_from_wav_file(wav_path):
         "happy": 0.2
     }
 
-    stress_score = stress_mapping.get(audio_emotion.lower(), 0.5)
+    stress_score = stress_mapping.get(audio_emotion.lower())
 
     return {
         "transcript": transcript,
