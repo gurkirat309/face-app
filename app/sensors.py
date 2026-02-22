@@ -36,7 +36,16 @@ def load_all_sensor_data() -> list:
         except Exception:
             # Fallback to JSON-lines
             lines = [l.strip() for l in content.splitlines() if l.strip()]
-            return [json.loads(line) for line in lines]
+            data = []
+            for line in lines:
+                try:
+                    # Clean the line of common stray characters that might break parsing
+                    cleaned = line.strip().lstrip('[').lstrip(']').rstrip(',').strip()
+                    if cleaned:
+                        data.append(json.loads(cleaned))
+                except json.JSONDecodeError:
+                    continue
+            return data
 
     except Exception as e:
         logger.exception("load_all_sensor_data error: %s", e)
@@ -44,10 +53,10 @@ def load_all_sensor_data() -> list:
 
 def load_live_sensors() -> Dict[str, Any]:
     """
-    Read the last sensor record from sensor_data.json.
+    Read the last valid sensor record from sensor_data.json.
     Supports:
       - JSON array: [ {...}, {...}, ... ] -> returns last element
-      - JSON-lines (one JSON per line) -> returns last non-empty line
+      - JSON-lines (one JSON per line) -> returns last valid non-empty line
     Returns dict with keys: heart_rate, temperature, lux
     """
     try:
@@ -59,22 +68,37 @@ def load_live_sensors() -> Dict[str, Any]:
             if not content:
                 return {}
 
-        # Try parse as JSON array
-        try:
-            parsed = json.loads(content)
-            if isinstance(parsed, list) and len(parsed) > 0:
-                last = parsed[-1]
-            elif isinstance(parsed, dict):
-                # single object
-                last = parsed
+        # 1. Try search for last line first (common in live updates)
+        lines = [l.strip() for l in content.splitlines() if l.strip()]
+        if lines:
+            # Try from end to start for the first valid JSON object
+            for line in reversed(lines):
+                try:
+                    cleaned = line.strip().lstrip('[').lstrip(']').rstrip(',').strip()
+                    if cleaned:
+                        last = json.loads(cleaned)
+                        if isinstance(last, dict):
+                            break
+                        elif isinstance(last, list) and last:
+                            last = last[-1]
+                            break
+                except (json.JSONDecodeError, ValueError):
+                    continue
             else:
                 last = None
-        except Exception:
-            # Fallback to JSON-lines: pick last non-empty line
-            lines = [l.strip() for l in content.splitlines() if l.strip()]
-            if not lines:
-                return {}
-            last = json.loads(lines[-1])
+        else:
+            last = None
+
+        if not last:
+            # 2. Try parse whole content as array
+            try:
+                parsed = json.loads(content)
+                if isinstance(parsed, list) and len(parsed) > 0:
+                    last = parsed[-1]
+                elif isinstance(parsed, dict):
+                    last = parsed
+            except Exception:
+                last = None
 
         if not last:
             return {}
