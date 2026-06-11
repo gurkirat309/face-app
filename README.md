@@ -10,36 +10,36 @@ The platform is designed around a decoupled, service-oriented architecture linki
 
 ```mermaid
 graph TD
-    A[HTML5/JS Dashboard] -->|Base64 MJPEG Video (5Hz)| B[FastAPI Backend - WebSockets]
-    A -->|PCM WAV Audio Buffer| B
-    C[IoT Sensor Hub - ESP32/ESP8266] -->|HTTP POST JSON| D[Flask Telemetry Server - Port 5000]
-    D -->|Append Data| E[sensor_data.json]
+    A["HTML5/JS Dashboard"] -->|"Base64 MJPEG Video (5Hz)"| B["FastAPI Backend - WebSockets"]
+    A -->|"PCM WAV Audio Buffer"| B
+    C["IoT Sensor Hub - ESP32/ESP8266"] -->|"HTTP POST JSON"| D["Flask Telemetry Server - Port 5000"]
+    D -->|"Append Data"| E["sensor_data.json"]
     
     subgraph Computer Vision Pipeline
-        B -->|Frame Stream| F[OpenCV Haar Cascade]
-        F -->|Face ROI Crop| G[TensorFlow/Keras CNN]
-        G -->|Face Emotion Labels| B
+        B -->|"Frame Stream"| F["OpenCV Haar Cascade"]
+        F -->|"Face ROI Crop"| G["TensorFlow/Keras CNN"]
+        G -->|"Face Emotion Labels"| B
     end
     
     subgraph Audio & NLP Pipeline
-        B -->|Audio Buffer| H[Whisper ASR - Text Transcription]
-        B -->|Audio Buffer| I[Whisper-v3 Speech Emotion Classifier]
-        H -->|Speech Text| J[DistilRoBERTa NLP Sentiment Analyzer]
-        I -->|Acoustic Features| K[Stress Scoring Logic]
-        J -->|Semantic Context| K
-        K -->|Vocal/Stress Analytics| B
+        B -->|"Audio Buffer"| H["Whisper ASR - Text Transcription"]
+        B -->|"Audio Buffer"| I["Whisper-v3 Speech Emotion Classifier"]
+        H -->|"Speech Text"| J["DistilRoBERTa NLP Sentiment Analyzer"]
+        I -->|"Acoustic Features"| K["Stress Scoring Logic"]
+        J -->|"Semantic Context"| K
+        K -->|"Vocal/Stress Analytics"| B
     end
     
     subgraph Diagnostics Engine
-        E -->|Raw Sensor Readings| L[Wellness Analysis Engine]
-        L -->|Sleep Analytics| M[Sleep Score 0-100]
-        L -->|Sedentary Tracking| N[Inactivity Warnings]
-        L -->|Stress & HRV Analysis| O[Stress Levels]
-        L -->|Burnout Assessment| P[Digital Burnout Index]
+        E -->|"Raw Sensor Readings"| L["Wellness Analysis Engine"]
+        L -->|"Sleep Analytics"| M["Sleep Score 0-100"]
+        L -->|"Sedentary Tracking"| N["Inactivity Warnings"]
+        L -->|"Stress & HRV Analysis"| O["Stress Levels"]
+        L -->|"Burnout Assessment"| P["Digital Burnout Index"]
     end
 
-    L -.->|Exposes REST API| B
-    B -->|Unified Analytics JSON| A
+    L -.->|"Exposes REST API"| B
+    B -->|"Unified Analytics JSON"| A
 ```
 
 ---
